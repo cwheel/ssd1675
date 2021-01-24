@@ -52,7 +52,7 @@ pub mod interface;
 
 pub use color::Color;
 pub use config::Builder;
-pub use display::{Dimensions, Display, Rotation};
+pub use display::{Dimensions, Display, Rotation, DisplayColor};
 pub use graphics::GraphicDisplay;
 pub use interface::DisplayInterface;
 pub use interface::Interface;

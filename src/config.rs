@@ -1,5 +1,6 @@
 use command::{BufCommand, Command, DataEntryMode, IncrementAxis};
-use display::{self, Dimensions, Rotation};
+use display::{self, Dimensions, Rotation, DisplayColor};
+use color::Color;
 
 /// Builder for constructing a display Config.
 ///
@@ -28,6 +29,8 @@ pub struct Builder<'a> {
     data_entry_mode: Command,
     dimensions: Option<Dimensions>,
     rotation: Rotation,
+    color: DisplayColor,
+    border_color: Command,
 }
 
 /// Error returned if Builder configuration is invalid.
@@ -47,6 +50,8 @@ pub struct Config<'a> {
     pub(crate) data_entry_mode: Command,
     pub(crate) dimensions: Dimensions,
     pub(crate) rotation: Rotation,
+    pub(crate) color: DisplayColor,
+    pub(crate) border_color: Command,
 }
 
 impl<'a> Default for Builder<'a> {
@@ -62,6 +67,8 @@ impl<'a> Default for Builder<'a> {
             ),
             dimensions: None,
             rotation: Rotation::default(),
+            color: DisplayColor::default(),
+            border_color: Command::BorderWaveform(0x31),
         }
     }
 }
@@ -163,6 +170,28 @@ impl<'a> Builder<'a> {
         Self { rotation, ..self }
     }
 
+    /// Set the display color if applicable (only matters for wHAT's)
+    ///
+    /// Defaults to BlackWhite but may be set to Red or Yellow
+    pub fn color(self, color: DisplayColor) -> Self {
+        Self { color, ..self }
+    }
+
+    /// Set the border color. May be any valid color::Color for the given display.
+    ///
+    /// Defaults to White
+    pub fn border_color(self, color: Color) -> Self {
+        Self { 
+            border_color: match color {
+                Color::White => Command::BorderWaveform(0x31),
+                Color::Black => Command::BorderWaveform(0x00),
+                Color::Red => Command::BorderWaveform(0x73),
+                Color::Yellow => Command::BorderWaveform(0x33),
+            },
+            ..self
+        }
+    }
+
     /// Build the display Config.
     ///
     /// Will fail if dimensions are not set.
@@ -175,6 +204,8 @@ impl<'a> Builder<'a> {
             data_entry_mode: self.data_entry_mode,
             dimensions: self.dimensions.ok_or_else(|| BuilderError {})?,
             rotation: self.rotation,
+            color: self.color,
+            border_color: self.border_color,
         })
     }
 }

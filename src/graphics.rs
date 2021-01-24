@@ -15,7 +15,9 @@ where
 {
     display: Display<'a, I>,
     black_buffer: &'a mut [u8],
-    red_buffer: &'a mut [u8],
+
+    // Buffer represents Red or Yellow color
+    alt_buffer: &'a mut [u8],
 }
 
 impl<'a, I> GraphicDisplay<'a, I>
@@ -29,12 +31,12 @@ where
     pub fn new(
         display: Display<'a, I>,
         black_buffer: &'a mut [u8],
-        red_buffer: &'a mut [u8],
+        alt_buffer: &'a mut [u8],
     ) -> Self {
         GraphicDisplay {
             display,
             black_buffer,
-            red_buffer,
+            alt_buffer,
         }
     }
 
@@ -44,7 +46,7 @@ where
         delay: &mut D,
     ) -> Result<(), I::Error> {
         self.display
-            .update(self.black_buffer, self.red_buffer, delay)
+            .update(self.black_buffer, self.alt_buffer, delay)
     }
 
     /// Clear the buffers, filling them a single color.
@@ -53,6 +55,7 @@ where
             Color::White => (0xFF, 0x00),
             Color::Black => (0x00, 0x00),
             Color::Red => (0xFF, 0xFF),
+            Color::Yellow => (0xFF, 0xFF),
         };
 
         for byte in &mut self.black_buffer.iter_mut() {
@@ -60,7 +63,7 @@ where
         }
 
         // TODO: Combine loops
-        for byte in &mut self.red_buffer.iter_mut() {
+        for byte in &mut self.alt_buffer.iter_mut() {
             *byte = red; // background_color.get_byte_value();
         }
     }
@@ -78,15 +81,19 @@ where
         match color {
             Color::Black => {
                 self.black_buffer[index] &= !bit;
-                self.red_buffer[index] &= !bit;
+                self.alt_buffer[index] &= !bit;
             }
             Color::White => {
                 self.black_buffer[index] |= bit;
-                self.red_buffer[index] &= !bit;
+                self.alt_buffer[index] &= !bit;
             }
             Color::Red => {
                 self.black_buffer[index] |= bit;
-                self.red_buffer[index] |= bit;
+                self.alt_buffer[index] |= bit;
+            }
+            Color::Yellow => {
+                self.black_buffer[index] |= bit;
+                self.alt_buffer[index] |= bit;
             }
         }
     }

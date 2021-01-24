@@ -4,6 +4,7 @@ pub enum Color {
     Black,
     White,
     Red,
+    Yellow,
 }
 
 #[cfg(feature = "graphics")]

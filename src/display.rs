@@ -8,9 +8,9 @@ use interface::DisplayInterface;
 
 // Max display resolution is 160x296
 /// The maximum number of rows supported by the controller
-pub const MAX_GATE_OUTPUTS: u16 = 296;
+pub const MAX_GATE_OUTPUTS: u16 = 300;
 /// The maximum number of columns supported by the controller
-pub const MAX_SOURCE_OUTPUTS: u8 = 160;
+pub const MAX_SOURCE_OUTPUTS: u16 = 400;
 
 // Magic numbers from the data sheet
 const ANALOG_BLOCK_CONTROL_MAGIC: u8 = 0x54;
@@ -25,7 +25,7 @@ pub struct Dimensions {
     /// The number of columns the display has.
     ///
     /// Must be less than or equal to MAX_SOURCE_OUTPUTS.
-    pub cols: u8,
+    pub cols: u16,
 }
 
 /// Represents the physical rotation of the display relative to the native orientation.
@@ -45,6 +45,21 @@ impl Default for Rotation {
     /// Default is no rotation (`Rotate0`).
     fn default() -> Self {
         Rotation::Rotate0
+    }
+}
+
+/// Represents the color of the display
+#[derive(Clone, Copy)]
+pub enum DisplayColor {
+    BlackWhite,
+    Red,
+    Yellow,
+}
+
+impl Default for DisplayColor {
+    /// Default is no rotation (`Rotate0`).
+    fn default() -> Self {
+        DisplayColor::BlackWhite
     }
 }
 
@@ -91,15 +106,27 @@ where
         Command::DriverOutputControl(self.config.dimensions.rows, 0x00)
             .execute(&mut self.interface)?;
 
+        Command::GateDrivingVoltage(0x17).execute(&mut self.interface)?;
+        Command::SourceDrivingVoltage(0x41, 0xAC, 0x32).execute(&mut self.interface)?;
+
         self.config.dummy_line_period.execute(&mut self.interface)?;
         self.config.gate_line_width.execute(&mut self.interface)?;
+        self.config.data_entry_mode.execute(&mut self.interface)?;
 
         // Command::GateDrivingVoltage(0b10000 | 0b0001);
         // Command::SourceDrivingVoltage(0x2D, 0xB2, 0x22).execute(&mut self.interface)?;
         self.config.write_vcom.execute(&mut self.interface)?;
 
-        // POR is HiZ. Need pull from config
-        // Command::BorderWaveform(u8).execute(&mut self.interface)?;
+        // Sepcial wHAT configuration
+        if self.config.dimensions.cols == 400 && self.config.dimensions.rows == 300 {
+            match self.config.color {
+                DisplayColor::Red => Command::SourceDrivingVoltage(0x30, 0xAC, 0x22).execute(&mut self.interface)?,
+                DisplayColor::Yellow => Command::SourceDrivingVoltage(0x07, 0xAC, 0x32).execute(&mut self.interface)?,
+                _ => ()
+            }    
+        }
+
+        self.config.border_color.execute(&mut self.interface)?;
 
         if let Some(ref write_lut) = self.config.write_lut {
             write_lut.execute(&mut self.interface)?;
@@ -107,7 +134,7 @@ where
 
         self.config.data_entry_mode.execute(&mut self.interface)?;
 
-        let end = self.config.dimensions.cols / 8 - 1;
+        let end = (self.config.dimensions.cols / 8 - 1) as u8;
         Command::StartEndXPosition(0, end).execute(&mut self.interface)?;
         Command::StartEndYPosition(0, self.config.dimensions.rows).execute(&mut self.interface)?;
 
@@ -125,7 +152,7 @@ where
         delay: &mut D,
     ) -> Result<(), I::Error> {
         // Write the B/W RAM
-        let buf_limit = libm::ceilf((self.rows() * self.cols() as u16) as f32 / 8.) as usize;
+        let buf_limit = libm::ceilf((self.rows() as f32 * self.cols() as f32) / 8.) as usize;
         Command::XAddress(0).execute(&mut self.interface)?;
         Command::YAddress(0).execute(&mut self.interface)?;
         BufCommand::WriteBlackData(&black[..buf_limit]).execute(&mut self.interface)?;
@@ -162,7 +189,7 @@ where
     }
 
     /// Returns the number of columns the display has.
-    pub fn cols(&self) -> u8 {
+    pub fn cols(&self) -> u16 {
         self.config.dimensions.cols
     }
 
